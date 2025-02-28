@@ -78,6 +78,15 @@ class Widget(Node):
             self.valid = None
 
     @property
+    def ifield_name(self):
+        root = self
+        while root.parent is not None:
+            root = root.parent
+        for name, ifield in root.ifields.items():
+            if self in ifield.widgets:
+                return name
+
+    @property
     def value(self):
         return self._value
 

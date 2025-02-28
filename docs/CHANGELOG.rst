@@ -44,9 +44,10 @@ New
   :code:`MyExercise().test()` is called.
 * Rudimentary database functionalities.
 * History log for statistical purposes and learning analytics.
-* New exercise method :code:`hints`: This method can be used to return a string
-  or an iterable of strings containing tips for students to solve an exercise.
-  In :code:`JupyterFrontend` these hints can be rendered via a button.
+* New exercise method :code:`hints`: This method can be used to return a
+  string, an iterable of strings or a dictionary for field-wise hints
+  containing tips for students to solve an exercise. In :code:`JupyterFrontend`
+  these hints can be rendered via a button.
 * History logging for learning analytics.
 * Make :code:`JupyterFrontend` Notebook 7 and JupyterLab compatible.
 
