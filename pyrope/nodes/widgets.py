@@ -96,7 +96,12 @@ class Widget(Node):
             ))
 
             # update value string
-            self._value_string = self.parent.dtype.stringify(value)
+            try:
+                self._value_string = self.parent.dtype.stringify(
+                    self.parent.value
+                )
+            except ValidationError:
+                self._value_string = str(value)
             self.notify(ChangeWidgetAttribute(
                 repr(self), self.ID, 'value_string', self._value_string
             ))
