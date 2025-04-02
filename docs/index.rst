@@ -165,7 +165,7 @@ Contact
 
 Software development:
     * Konrad Schöbel <konrad.schoebel@htwk-leipzig.de>
-    * Paul Brassel <paul.brassel@htwk-leipzig.de>
+    * Paul Brassel <paul.brassel@medizin.uni-leipzig.de>
 
 Exercise pools:
     * Jochen Merker <jochen.merker@htwk-leipzig.de>
