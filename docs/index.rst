@@ -135,8 +135,13 @@ Then change to your install directory and run the commands below.
             python3 -m pyrope run
 
 
+Documentation
+=============
+
+This documentation is available online at `Read the Docs
+<https://pyrope-edu.readthedocs.io/>`_.
+
 .. toctree::
-    :caption: Documentation
     :maxdepth: 2
 
     installation
