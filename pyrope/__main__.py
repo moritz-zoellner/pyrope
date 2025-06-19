@@ -9,18 +9,25 @@ import nbformat
 
 from pyrope import examples, ExercisePool, ExerciseRunner
 from pyrope.core import CLIParser
-from pyrope.frontends import ConsoleFrontend
+from pyrope.frontends import ConsoleFrontend, WebFrontend
 
 
 parser = CLIParser(prog='python3 -m pyrope')
 args = parser.parse_args()
 
 pool = ExercisePool()
+
 if not args.filepaths:
     pool.add_exercises_from_module(examples)
 else:
     for path in args.filepaths:
         pool.add_exercises_from_file(path)
+
+
+pool = ExercisePool()
+pool.append(examples.Apples())
+from mypool import pool as mypool
+pool.extend(mypool)
 
 if args.subcommand == 'run':
 
@@ -92,6 +99,7 @@ if args.subcommand == 'run':
                     '.ipynb_checkpoints'
                 )
                 try:
+
                     checkpoint_file = os.path.join(
                         checkpoint_path,
                         f'{filename}-checkpoint.ipynb'
@@ -107,7 +115,12 @@ if args.subcommand == 'run':
                 break
             except KeyboardInterrupt:
                 print('Please wait for cleanup.')
-
+    if args.frontend == 'web':
+        print(f"Running web frontend.")
+        frontend = WebFrontend(pool)
+        frontend.run()
+        print(f"Web frontend shut down.")
+        
 if args.subcommand == 'test':
     test_cases = [
         test_case

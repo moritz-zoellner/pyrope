@@ -875,7 +875,7 @@ class CLIParser:
         run_parser.add_argument(
             '--frontend',
             default=default_frontend,
-            choices={'console', 'jupyter'},
+            choices={'console', 'jupyter', 'web'},
             help='exercises renderer',
         )
         run_parser.add_argument(
