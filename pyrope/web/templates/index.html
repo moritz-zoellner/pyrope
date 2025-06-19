@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Pyrope Aufgabenübersicht</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Aufgabenübersicht</h1>
+    <div id="task-list"></div>
+    <iframe id="task-frame" src="" frameborder="0"></iframe>
+
+    <script>
+        async function fetchStructure() {
+            const res = await fetch('/structure');
+            return await res.json();
+        }
+
+        function createTaskList(structure, basePath = '') {
+            const container = document.getElementById('task-list');
+            structure.forEach((item, idx) => {
+                if (item.type === 'exercise') {
+                    const button = document.createElement('button');
+                    button.textContent = item.name;
+                    const path = `${basePath}${item.name}?`;
+                    button.onclick = () => {
+                        document.getElementById('task-frame').src = `http://localhost:8866/voila/render/${path}`;
+                    };
+                    container.appendChild(button);
+                } else if (item.type === 'pool') {
+                    const label = document.createElement('div');
+                    label.textContent = item.name;
+                    label.classList.add('pool-label');
+                    container.appendChild(label);
+                    createTaskList(item.items, `${basePath}${item.name}/`);
+                }
+            });
+        }
+
+        fetchStructure().then(structure => {
+            console.log('Fetched structure:', structure);
+            createTaskList(structure);
+        });
+    </script>
+</body>
+</html>

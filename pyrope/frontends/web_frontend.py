@@ -3,6 +3,10 @@ import subprocess, os, shutil, threading
 import nbformat
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+from fastapi.requests import Request
 import uvicorn
 
 
@@ -13,7 +17,7 @@ class WebFrontend:
         self.voila = None
         self.tmp_dir = 'tmp_dir'
 
-        self.api_app = FastAPI()
+        self.app = FastAPI()
         self.api_host = "127.0.0.1"
         self.api_port = 8000
         self._setup_api()
@@ -21,7 +25,14 @@ class WebFrontend:
 # ------ Rest API ------
 
     def _setup_api(self):
-        @self.api_app.get("/structure")
+        self.app.mount("/static", StaticFiles(directory="pyrope/web/static"), name="static")
+        templates = Jinja2Templates(directory="pyrope/web/templates")
+
+        @self.app.get("/", response_class=HTMLResponse)
+        def root(request: Request):
+            return templates.TemplateResponse("index.html", {"request": request})
+
+        @self.app.get("/structure")
         def get_structure():
             return self._pool_to_dict(self.pool)
     
@@ -42,7 +53,7 @@ class WebFrontend:
         return items
     
     def _start_api(self):
-        uvicorn.run(self.api_app, host=self.api_host, port=self.api_port, log_level="info")
+        uvicorn.run(self.app, host=self.api_host, port=self.api_port, log_level="info")
 
 
 # ------ Voila/Notebooks ------  
@@ -87,7 +98,8 @@ class WebFrontend:
     def open_voila(self):
         process = subprocess.Popen([
             "voila",
-            self.tmp_dir,
+            "tmp_dir",
+            "--Voila.tornado_settings={\"headers\":{\"Content-Security-Policy\":\"frame-ancestors self *\" }}"
         ])
         return process
 
