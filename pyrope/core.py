@@ -160,7 +160,7 @@ class Exercise(abc.ABC):
             return None
         return '\n\n'.join(classes)
 
-    def run(self, debug=False, difficulty=None, global_parameters=None):
+    def run(self, debug=False, difficulty=None, global_parameters=None, callback=None):
         if difficulty is not None:
             if not (
                 isinstance(difficulty, float_types) and
@@ -173,7 +173,8 @@ class Exercise(abc.ABC):
             difficulty = float(difficulty)
         self.difficulty = difficulty
         runner = ExerciseRunner(
-            self, debug=debug, global_parameters=global_parameters
+            self, debug=debug, global_parameters=global_parameters,
+            callback=callback
         )
         if get_ipython() is not None:
             frontend = frontends.JupyterFrontend()
@@ -397,6 +398,17 @@ class ParametrizedExercise:
         hints = self.apply(self.exercise.hints, self.parameters)
         if isinstance(hints, str):
             hints = (hints,)
+        if isinstance(hints, dict):
+            if len(hints) == 0:
+                return ()
+            for name in self.ifields.keys():
+                ifield_hints = hints.get(name, ())
+                if isinstance(ifield_hints, str):
+                    ifield_hints = (ifield_hints,)
+                hints[name] = tuple(ifield_hints)
+            if len(self.ifields) == 1:
+                return list(hints.values())[0]
+            return hints
         return tuple(hints)
 
     @cached_property
@@ -687,7 +699,7 @@ class ParametrizedExercise:
 
 class ExerciseRunner:
 
-    def __init__(self, exercise, debug=False, global_parameters=None):
+    def __init__(self, exercise, debug=False, global_parameters=None, callback=None):
         self.debug = debug
         self.observers = []
         self.pexercise = ParametrizedExercise(exercise, global_parameters)
@@ -697,6 +709,7 @@ class ExerciseRunner:
         self.widget_id_mapping = {
             widget.ID: widget for widget in self.pexercise.widgets
         }
+        self.callback = callback
         if self.pexercise.id is None:
             return
         with DBSession() as session:
@@ -739,7 +752,10 @@ class ExerciseRunner:
             ))
             widget.observe_attributes()
             self.notify(ChangeWidgetAttribute(
-                self.sender, widget.ID, 'info', widget.info
+                repr(widget), widget.ID, 'info', widget.info
+            ))
+            self.notify(ChangeWidgetAttribute(
+                repr(widget), widget.ID, 'ifield_name', widget.ifield_name
             ))
         self.notify(RenderTemplate(
             self.sender, 'problem', self.pexercise.template
@@ -782,6 +798,11 @@ class ExerciseRunner:
                 score_given=self.pexercise.total_score
             ))
             session.commit()
+        if self.callback is not None:
+            self.callback(
+                self.pexercise.total_score,
+                self.pexercise.max_total_score
+            )
         history_log.info(json.dumps(self.pexercise.summary, default=str))
 
     def publish_solutions(self):

@@ -6,9 +6,11 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>Aufgabenübersicht</h1>
-    <div id="task-list"></div>
-    <iframe id="task-frame" src="" frameborder="0"></iframe>
+    <h1>Pyrope Aufgabenübersicht</h1>
+    <div class="main-container">
+        <div id="task-list" class="task-list"></div>
+        <iframe id="task-frame" src="" frameborder="0"></iframe>
+    </div>
 
     <script>
         async function fetchStructure() {
@@ -16,15 +18,17 @@
             return await res.json();
         }
 
-        function createTaskList(structure, basePath = '') {
-            const container = document.getElementById('task-list');
-            structure.forEach((item, idx) => {
+        function createTaskList(structure, basePath = '', indent = 0) {
+            const container = document.createElement('div');
+            container.classList.add('task-sublist');
+            container.style.marginLeft = `${indent * 20}px`;
+
+            structure.forEach(item => {
                 if (item.type === 'exercise') {
-                    const button = document.createElement('button');
+                    const button = document.createElement('p');
                     button.textContent = item.name;
-                    const path = `${basePath}${item.name}?`;
                     button.onclick = () => {
-                        document.getElementById('task-frame').src = `http://localhost:8866/voila/render/${path}`;
+                        document.getElementById('task-frame').src = `http://localhost:8866/voila/render/${basePath}${item.name}?`;
                     };
                     container.appendChild(button);
                 } else if (item.type === 'pool') {
@@ -32,14 +36,16 @@
                     label.textContent = item.name;
                     label.classList.add('pool-label');
                     container.appendChild(label);
-                    createTaskList(item.items, `${basePath}${item.name}/`);
+                    container.appendChild(createTaskList(item.items, `${basePath}${item.name}/`, indent + 1));
                 }
             });
+
+            return container;
         }
 
         fetchStructure().then(structure => {
-            console.log('Fetched structure:', structure);
-            createTaskList(structure);
+            const root = document.getElementById('task-list');
+            root.appendChild(createTaskList(structure));
         });
     </script>
 </body>

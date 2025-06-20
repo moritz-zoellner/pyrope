@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from fastapi.requests import Request
 import uvicorn
+import webbrowser, time
 
 
 class WebFrontend:
@@ -36,6 +37,9 @@ class WebFrontend:
         def get_structure():
             return self._pool_to_dict(self.pool)
     
+    def _start_api(self):
+        uvicorn.run(self.app, host=self.api_host, port=self.api_port, log_level="info")
+
     def _pool_to_dict(self, pool):
         from pyrope.core import Exercise, ExercisePool
 
@@ -52,13 +56,10 @@ class WebFrontend:
                 count_pools += 1
         return items
     
-    def _start_api(self):
-        uvicorn.run(self.app, host=self.api_host, port=self.api_port, log_level="info")
-
 
 # ------ Voila/Notebooks ------  
 
-    def build_notebook_dir(self, pool, dir):
+    def _build_notebook_dir(self, pool, dir):
         from pyrope.core import Exercise, ExercisePool
 
         os.makedirs(dir, exist_ok=True)
@@ -91,14 +92,15 @@ class WebFrontend:
 
             elif isinstance(item, ExercisePool):
                 subdir = os.path.join(dir, f'{count_pools}_subpool')
-                self.build_notebook_dir(item, subdir)
+                self._build_notebook_dir(item, subdir)
 
                 count_pools += 1
 
-    def open_voila(self):
+    def _open_voila(self):
         process = subprocess.Popen([
             "voila",
             "tmp_dir",
+            "--no-browser",
             "--Voila.tornado_settings={\"headers\":{\"Content-Security-Policy\":\"frame-ancestors self *\" }}"
         ])
         return process
@@ -107,11 +109,14 @@ class WebFrontend:
 
     def run(self):
         try:
-            self.build_notebook_dir(self.pool, self.tmp_dir)
+            self._build_notebook_dir(self.pool, self.tmp_dir)
             self.api_thread = threading.Thread(target=self._start_api, daemon=True)
             self.api_thread.start()
 
-            self.voila = self.open_voila()
+            self.voila = self._open_voila()
+
+            time.sleep(1)
+            webbrowser.open_new_tab(f'http://{self.api_host}:{self.api_port}/')
             self.voila.wait()
 
         except KeyboardInterrupt:

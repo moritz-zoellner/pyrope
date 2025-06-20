@@ -115,6 +115,7 @@ if args.subcommand == 'run':
                 break
             except KeyboardInterrupt:
                 print('Please wait for cleanup.')
+                
     if args.frontend == 'web':
         print(f"Running web frontend.")
         frontend = WebFrontend(pool)

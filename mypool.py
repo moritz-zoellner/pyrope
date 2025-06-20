@@ -10,8 +10,12 @@ pool = ExercisePool([
     ExercisePool([
         IntegerDivision(),
         QuadraticEquation(),
-        examples.Factorisation()
-    ])
-
+        examples.Factorisation(),
+        ExercisePool([
+            examples.FreeLunch(),
+            examples.FortyTwo(),
+        ])
+    ]),
+    examples.Factor()
 ])
 
