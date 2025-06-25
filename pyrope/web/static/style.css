@@ -1,5 +1,4 @@
-body {
-    font-family: Arial, sans-serif;
+body { font-family: Arial, sans-serif;
     margin: 0;
     padding: 0;
 }
@@ -40,7 +39,7 @@ button {
 }
 
 button:hover {
-    background-color: #e0e0e0;
+    background-color: blue;
 }
 
 .pool-label {
@@ -48,9 +47,16 @@ button:hover {
     margin-top: 1em;
 }
 
-iframe {
+.iframe-container {
     flex-grow: 1;
-    border: none;
+    display: flex;
+    flex-direction: column;
 }
 
+.task-frame {
+    flex-grow: 1;
+    width: 100%;
+    border: none;
+    display: none;
+}
 

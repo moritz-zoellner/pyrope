@@ -1,9 +1,11 @@
 *.pyc
 __pycache__/
 *.egg-info/
+tmp_dir/ 
 
 # Jupyter
 .ipynb_checkpoints/
 
 # PyCharm
 .idea/
+

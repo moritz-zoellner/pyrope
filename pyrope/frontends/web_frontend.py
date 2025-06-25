@@ -4,9 +4,8 @@ import nbformat
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-from fastapi.requests import Request
+from fastapi.responses import FileResponse
+
 import uvicorn
 import webbrowser, time
 
@@ -27,12 +26,11 @@ class WebFrontend:
 
     def _setup_api(self):
         self.app.mount("/static", StaticFiles(directory="pyrope/web/static"), name="static")
-        templates = Jinja2Templates(directory="pyrope/web/templates")
 
-        @self.app.get("/", response_class=HTMLResponse)
-        def root(request: Request):
-            return templates.TemplateResponse("index.html", {"request": request})
-
+    # Root-Endpunkt: Liefert einfach eine HTML-Datei
+        @self.app.get("/")
+        def root():
+            return FileResponse("pyrope/web/index.html")
         @self.app.get("/structure")
         def get_structure():
             return self._pool_to_dict(self.pool)
@@ -59,7 +57,7 @@ class WebFrontend:
 
 # ------ Voila/Notebooks ------  
 
-    def _build_notebook_dir(self, pool, dir):
+    def _build_notebook_dir(self, pool, dir, path=''):
         from pyrope.core import Exercise, ExercisePool
 
         os.makedirs(dir, exist_ok=True)
@@ -74,34 +72,49 @@ class WebFrontend:
 
                 nb = nbformat.v4.new_notebook()
 
+                file_name = f'{count_exercises}_{name}'
+
+                path_id = f"{path}/{file_name}"
                 code = (
                     'import sys, os\n'
                     'sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))\n'
-                    'import pyrope\n' \
+                    'import pyrope\n' 
+                    f'id = "{path_id}"\n'
                     f'from {module} import {name}\n'
                     f'{name}().run()'
                 )
                 
                 nb['cells'] = [nbformat.v4.new_code_cell(code)]
 
-                file = f'{count_exercises}_{name}.ipynb'
+                file = f'{file_name}.ipynb'
                 with open(os.path.join(dir, file), 'w') as f:
                     nbformat.write(nb, f)
 
                 count_exercises += 1
 
             elif isinstance(item, ExercisePool):
-                subdir = os.path.join(dir, f'{count_pools}_subpool')
-                self._build_notebook_dir(item, subdir)
+                pool_name = f'{count_pools}_subpool'
+                subdir = os.path.join(dir, pool_name)
+                self._build_notebook_dir(item, subdir, f'{path}/{pool_name}')
 
                 count_pools += 1
 
     def _open_voila(self):
+        
+        settings_str = (
+            "{"
+            "  'headers': {"
+            "    'Content-Security-Policy': \"frame-ancestors 'self' *\""
+            "  }, "
+            "  'disable_check_xsrf': True"
+            "}"
+        )
+            
         process = subprocess.Popen([
             "voila",
             "tmp_dir",
             "--no-browser",
-            "--Voila.tornado_settings={\"headers\":{\"Content-Security-Policy\":\"frame-ancestors self *\" }}"
+            f"--Voila.tornado_settings={settings_str}"
         ])
         return process
 

@@ -754,9 +754,9 @@ class ExerciseRunner:
             self.notify(ChangeWidgetAttribute(
                 repr(widget), widget.ID, 'info', widget.info
             ))
-            self.notify(ChangeWidgetAttribute(
-                repr(widget), widget.ID, 'ifield_name', widget.ifield_name
-            ))
+            # self.notify(ChangeWidgetAttribute(
+            #     repr(widget), widget.ID, 'ifield_name', widget.ifield_name
+            # ))
         self.notify(RenderTemplate(
             self.sender, 'problem', self.pexercise.template
         ))
