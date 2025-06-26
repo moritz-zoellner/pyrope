@@ -76,12 +76,23 @@ class WebFrontend:
 
                 path_id = f"{path}/{file_name}"
                 code = (
-                    'import sys, os\n'
+                    'import sys, os, json\n'
+                    'import ipywidgets as widgets\n'
+                    'from IPython.display import Javascript\n'
                     'sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))\n'
-                    'import pyrope\n' 
-                    f'id = "{path_id}"\n'
                     f'from {module} import {name}\n'
-                    f'{name}().run()'
+                    f'id = "{path_id}"\n'
+                    'outputSpace=widgets.Output()\n'
+                    'display(outputSpace)\n'
+                    'def postResult(score, max_score):\n' \
+                    '   message = {\n'
+                    '    "type": "results", "id": id, "score": score, "maxScore": max_score\n'
+                    '   }\n' \
+                    '   js_code=f"window.parent.postMessage({json.dumps(message)},\\"*\\"); console.log({json.dumps(message)})"\n'
+                    '   print(js_code) \n'
+                    '   with outputSpace: \n'
+                    '       display(Javascript(js_code))\n'
+                    f'{name}().run(callback=postResult)\n '
                 )
                 
                 nb['cells'] = [nbformat.v4.new_code_cell(code)]

@@ -30,12 +30,12 @@
                     // Button zum Anzeigen
                     const button = document.createElement('button');
                     button.textContent = item.name;
-                    button.onclick = () => showIframe(fullPath);
+                    button.onclick = () => showIframe(fullPath.slice(0,-6));
                     container.appendChild(button);
 
                     // Iframe vorbereiten
                     const iframe = document.createElement('iframe');
-                    iframe.src = `http://localhost:8866/voila/render/${fullPath}`;
+                    iframe.src = `http://localhost:8866/voila/render${fullPath}?`;
                     iframe.classList.add('task-frame');
                     iframe.style.display = 'none';
                     iframe.dataset.path = fullPath.slice(0,-6);
