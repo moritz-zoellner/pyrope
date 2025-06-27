@@ -2,18 +2,86 @@
 import os
 import subprocess
 import sys
+import importlib
 import unittest
 from uuid import uuid4
 
 import nbformat
 
-from pyrope import examples, ExercisePool, ExerciseRunner
+from pyrope import examples, templates, ExercisePool, ExerciseRunner
 from pyrope.core import CLIParser
 from pyrope.frontends import ConsoleFrontend, WebFrontend
 
 
 parser = CLIParser(prog='python3 -m pyrope')
 args = parser.parse_args()
+
+if args.subcommand == 'serve':
+    webdir = args.webdir
+
+    if webdir and not os.path.isdir(webdir):
+        answer = input(f"Directory '{webdir}' not found. Continue using default template? (y/n): ").strip().lower()
+        if answer != 'y':
+            print("Aborted.")
+            sys.exit(1)
+        else:
+            webdir = None 
+
+    if webdir and not os.path.isfile(os.path.join(webdir, "index.html")):
+        answer = input(f"No 'index.html' found in '{webdir}'. Continue using default template? (y/n): ").strip().lower()
+        if answer != 'y':
+            print("Aborted.")
+            sys.exit(1)
+        else:
+            webdir = None
+            
+    if webdir and not os.path.isdir(os.path.join(webdir, "static")):
+        answer = input(f"No 'static/' folder found in '{webdir}'. Continue using default template? (y/n): ").strip().lower()
+        if answer != 'y':
+            print("Aborted.")
+            sys.exit(1)
+        else:
+            webdir = None
+
+
+    pool = ExercisePool()
+
+    if not args.filepath:
+        pool.add_exercises_from_module(examples)
+        subpool = ExercisePool()
+        subpool.add_exercises_from_module(templates)
+        pool.append(subpool)
+    else:
+        dirname, filename = os.path.split(args.filepath)
+        modulename, ext = os.path.splitext(filename)
+        if ext != '.py':
+            raise TypeError(f'{args.filepath} is not a Python file.')
+        sys.path.insert(0, dirname)
+        
+        importlib.invalidate_caches()
+        if modulename in sys.modules:
+            module = sys.modules[modulename]
+            importlib.reload(module)
+        else:
+            module = importlib.import_module(modulename)
+
+        pools = [
+            value for value in vars(module).values()
+            if isinstance(value, ExercisePool)
+        ]
+
+        if not pools:
+            raise ValueError(f'No ExercisePool found in {args.filepath}')
+        if len(pools) > 1:
+            raise ValueError(f'Multiple ExercisePools found in {args.filepath}')
+        pool = pools[0]
+
+    print(f"Running web frontend.")
+    frontend = WebFrontend(pool,web_dir=webdir)
+    frontend.run()
+    print(f"Web frontend shut down.")
+
+    sys.exit(0) 
 
 pool = ExercisePool()
 
@@ -22,12 +90,6 @@ if not args.filepaths:
 else:
     for path in args.filepaths:
         pool.add_exercises_from_file(path)
-
-
-pool = ExercisePool()
-pool.append(examples.Apples())
-from mypool import pool as mypool
-pool.extend(mypool)
 
 if args.subcommand == 'run':
 
@@ -116,11 +178,6 @@ if args.subcommand == 'run':
             except KeyboardInterrupt:
                 print('Please wait for cleanup.')
                 
-    if args.frontend == 'web':
-        print(f"Running web frontend.")
-        frontend = WebFrontend(pool)
-        frontend.run()
-        print(f"Web frontend shut down.")
         
 if args.subcommand == 'test':
     test_cases = [

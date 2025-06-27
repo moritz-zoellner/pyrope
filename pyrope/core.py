@@ -896,7 +896,7 @@ class CLIParser:
         run_parser.add_argument(
             '--frontend',
             default=default_frontend,
-            choices={'console', 'jupyter', 'web'},
+            choices={'console', 'jupyter'},
             help='exercises renderer',
         )
         run_parser.add_argument(
@@ -910,6 +910,24 @@ class CLIParser:
             action='store_true',
             help='enables debug mode for the frontend',
         )
+
+        serve_parser = subparsers.add_parser(
+            'serve',
+            help='serve a pool of exercises in a web interface'
+        )
+        serve_parser.add_argument(
+            'filepath',
+            nargs='?',
+            type=str,
+            help='path to python script with definition of exercise pool'
+        )
+        serve_parser.add_argument(
+            '--webdir',
+            type=str,
+            default=None,
+            help='path to folder with frontend template (with ./index.html and ./static/)'
+        )
+
 
         test_parser = subparsers.add_parser(
             'test',

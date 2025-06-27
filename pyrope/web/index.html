@@ -30,6 +30,7 @@
                     // Button zum Anzeigen
                     const button = document.createElement('button');
                     button.textContent = item.name;
+                    button.id = `btn_${fullPath.slice(0,-6)}`;
                     button.onclick = () => showIframe(fullPath.slice(0,-6));
                     container.appendChild(button);
 
@@ -65,6 +66,34 @@
             root.appendChild(createTaskList(structure));
             document.getElementById('iframe-container').firstChild.style.display = 'block'
         });
+
+        window.addEventListener("message", function(event) {
+            // Sicherheits-Check optional: Nur eigene Domain erlauben
+            // if (event.origin !== "http://localhost:8000") return;
+
+            const data = event.data;
+            if (data?.type === "results" && data.id) {
+                const btnId = `btn_${data.id}`;
+                const button = document.getElementById(btnId);
+
+                if (button) {
+                    const percentage = data.score / data.maxScore;
+                    
+                    if (percentage >= 0.5) {
+                        button.style.backgroundColor = "#d4edda"; // grünlich
+                        button.style.color = "#155724";
+                    } else {
+                        button.style.backgroundColor = "#f8d7da"; // rötlich
+                        button.style.color = "#721c24";
+                    }
+
+                    // Punktzahl anzeigen
+                    button.textContent = `${data.id.split("/").pop()} (${data.score}/${data.maxScore})`;
+                } else {
+                    console.warn("No button found for ID:", btnId);
+                }
+            }
+        });  
     </script>
 </body>
 </html>

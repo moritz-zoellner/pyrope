@@ -12,11 +12,12 @@ import webbrowser, time
 
 class WebFrontend:
 
-    def __init__(self, pool):
+    def __init__(self, pool, web_dir = None):
         self.pool = pool
         self.voila = None
         self.tmp_dir = 'tmp_dir'
 
+        self.web_dir = web_dir or 'pyrope/web'
         self.app = FastAPI()
         self.api_host = "127.0.0.1"
         self.api_port = 8000
@@ -25,12 +26,12 @@ class WebFrontend:
 # ------ Rest API ------
 
     def _setup_api(self):
-        self.app.mount("/static", StaticFiles(directory="pyrope/web/static"), name="static")
+        self.app.mount("/static", StaticFiles(directory = os.path.join(self.web_dir, 'static')), name="static")
 
     # Root-Endpunkt: Liefert einfach eine HTML-Datei
         @self.app.get("/")
         def root():
-            return FileResponse("pyrope/web/index.html")
+            return FileResponse(os.path.join(self.web_dir, 'index.html'))
         @self.app.get("/structure")
         def get_structure():
             return self._pool_to_dict(self.pool)
@@ -88,8 +89,7 @@ class WebFrontend:
                     '   message = {\n'
                     '    "type": "results", "id": id, "score": score, "maxScore": max_score\n'
                     '   }\n' \
-                    '   js_code=f"window.parent.postMessage({json.dumps(message)},\\"*\\"); console.log({json.dumps(message)})"\n'
-                    '   print(js_code) \n'
+                    '   js_code=f"window.parent.postMessage({json.dumps(message)},\\"*\\");"\n' #console.log({json.dumps(message)})"\n'
                     '   with outputSpace: \n'
                     '       display(Javascript(js_code))\n'
                     f'{name}().run(callback=postResult)\n '
