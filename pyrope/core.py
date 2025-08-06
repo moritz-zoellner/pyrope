@@ -830,6 +830,40 @@ class ExerciseRunner:
         elif isinstance(msg, Submit):
             self.finish()
 
+class Quiz(collections.UserList):
+    def __init__(self, items=None, *, title=None, select=0, shuffle=False, navigation='free', weights=None):
+        super().__init__()
+        self.title = title
+        self.select = select
+        self.shuffle = shuffle
+        self.navigation = navigation
+        self.weights = weights or {}
+
+        if items is not None:
+            for item in items:
+                self.append(item)  # Uses overridden append()
+
+    def append(self, item):
+        if not isinstance(item, (Exercise, Quiz)):
+            raise TypeError(f"Quiz can only contain Exercise or Quiz instances, got {type(item)}")
+        super().append(item)
+
+    def insert(self, index, item):
+        if not isinstance(item, (Exercise, Quiz)):
+            raise TypeError(f"Quiz can only contain Exercise or Quiz instances, got {type(item)}")
+        super().insert(index, item)
+
+    def add_exercises_from_module(self, module, *exercise_names):
+        # Calling the '__dir__' method instead of the 'dir' built-in
+        # avoids alphabetical sorting of the exercises added to the pool.
+        if len(exercise_names) == 0:
+            exercise_names = module.__dir__()
+        for name in exercise_names:
+            obj = getattr(module, name)
+            if isinstance(obj, type) and issubclass(obj, Exercise):
+                if not inspect.isabstract(obj):
+                    self.data.append(obj())
+
 
 class ExercisePool(collections.UserList):
 

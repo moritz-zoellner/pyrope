@@ -9,7 +9,7 @@ from uuid import uuid4
 import nbformat
 
 from pyrope import examples, templates, ExercisePool, ExerciseRunner
-from pyrope.core import CLIParser
+from pyrope.core import CLIParser, Quiz
 from pyrope.frontends import ConsoleFrontend, WebFrontend
 
 
@@ -44,13 +44,13 @@ if args.subcommand == 'serve':
             webdir = None
 
 
-    pool = ExercisePool()
+    quiz = Quiz()
 
     if not args.filepath:
-        pool.add_exercises_from_module(examples)
-        subpool = ExercisePool()
+        quiz.add_exercises_from_module(examples)
+        subpool = Quiz()
         subpool.add_exercises_from_module(templates)
-        pool.append(subpool)
+        quiz.append(subpool)
     else:
         dirname, filename = os.path.split(args.filepath)
         modulename, ext = os.path.splitext(filename)
@@ -65,19 +65,19 @@ if args.subcommand == 'serve':
         else:
             module = importlib.import_module(modulename)
 
-        pools = [
+        quizzes = [
             value for value in vars(module).values()
-            if isinstance(value, ExercisePool)
+            if isinstance(value, Quiz)
         ]
 
-        if not pools:
-            raise ValueError(f'No ExercisePool found in {args.filepath}')
-        if len(pools) > 1:
-            raise ValueError(f'Multiple ExercisePools found in {args.filepath}')
-        pool = pools[0]
+        if not quizzes:
+            raise ValueError(f'No Quiz found in {args.filepath}')
+        if len(quizzes) > 1:
+            raise ValueError(f'Multiple Quizzes found in {args.filepath}')
+        quiz = quizzes[0]
 
     print(f"Running web frontend.")
-    frontend = WebFrontend(pool,web_dir=webdir)
+    frontend = WebFrontend(quiz, web_dir=webdir)
     frontend.run()
     print(f"Web frontend shut down.")
 

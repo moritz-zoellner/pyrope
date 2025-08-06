@@ -12,8 +12,8 @@ import webbrowser, time
 
 class WebFrontend:
 
-    def __init__(self, pool, web_dir = None):
-        self.pool = pool
+    def __init__(self, quiz, web_dir = None):
+        self.quiz = quiz
         self.voila = None
         self.tmp_dir = 'tmp_dir'
 
@@ -34,38 +34,63 @@ class WebFrontend:
             return FileResponse(os.path.join(self.web_dir, 'index.html'))
         @self.app.get("/structure")
         def get_structure():
-            return self._pool_to_dict(self.pool)
+            return self._build_structure(self.quiz)
     
     def _start_api(self):
         uvicorn.run(self.app, host=self.api_host, port=self.api_port, log_level="info")
 
-    def _pool_to_dict(self, pool):
-        from pyrope.core import Exercise, ExercisePool
+    def _build_structure(self, quiz):
+        from pyrope.core import Exercise, Quiz
+
+        structure = {
+            "title": quiz.title,
+            "navigation": quiz.navigation,
+            "weights": quiz.weights,
+            "items": []
+        }
+
+        count_exercises = 0
+        count_quizzes = 0
+
+        for item in quiz:
+            if isinstance(item, Exercise):
+                structure["items"].append(f'{count_exercises}_{item.__class__.__name__}.ipynb')
+                count_exercises += 1
+            elif isinstance(item, Quiz):
+                sub_structure = self._build_structure(item)
+                sub_structure["title"] = item.title or f'{count_quizzes}_subquiz'
+                structure["items"].append(sub_structure)
+                count_quizzes += 1
+
+        return structure
+        
+    def _quiz_to_dict(self, quiz):
+        from pyrope.core import Exercise, Quiz
 
         items = []
         count_exercises = 0
-        count_pools = 0
+        count_quizzes = 0
 
-        for item in pool:
+        for item in quiz:
             if isinstance(item, Exercise):
                 items.append({"type": "exercise", "name": f'{count_exercises}_{item.__class__.__name__}.ipynb'})
                 count_exercises += 1
-            elif isinstance(item, ExercisePool):
-                items.append({"type": "pool", "name": f'{count_pools}_subpool'  , "items": self._pool_to_dict(item)})
-                count_pools += 1
+            elif isinstance(item, Quiz):
+                items.append({"type": "quiz", "name": item.title or f'{count_quizzes}_subquiz'  , "items": self._quiz_to_dict(item)})
+                count_quizzes += 1
         return items
     
 
 # ------ Voila/Notebooks ------  
 
-    def _build_notebook_dir(self, pool, dir, path=''):
-        from pyrope.core import Exercise, ExercisePool
+    def _build_notebook_dir(self, quiz, dir, path=''):
+        from pyrope.core import Exercise, Quiz
 
         os.makedirs(dir, exist_ok=True)
         count_exercises = 0
-        count_pools = 0
+        count_quizzes = 0
 
-        for item in pool:
+        for item in quiz:
             if isinstance(item, Exercise):
 
                 name = item.__class__.__name__
@@ -103,12 +128,12 @@ class WebFrontend:
 
                 count_exercises += 1
 
-            elif isinstance(item, ExercisePool):
-                pool_name = f'{count_pools}_subpool'
-                subdir = os.path.join(dir, pool_name)
-                self._build_notebook_dir(item, subdir, f'{path}/{pool_name}')
+            elif isinstance(item, Quiz):
+                quiz_name = item.title or f'{count_quizzes}_subquiz'
+                subdir = os.path.join(dir, quiz_name)
+                self._build_notebook_dir(item, subdir, f'{path}/{quiz_name}')
 
-                count_pools += 1
+                count_quizzes += 1
 
     def _open_voila(self):
         
@@ -133,7 +158,7 @@ class WebFrontend:
 
     def run(self):
         try:
-            self._build_notebook_dir(self.pool, self.tmp_dir)
+            self._build_notebook_dir(self.quiz, self.tmp_dir)
             self.api_thread = threading.Thread(target=self._start_api, daemon=True)
             self.api_thread.start()
 
