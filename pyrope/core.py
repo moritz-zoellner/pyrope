@@ -16,6 +16,8 @@ import pathlib
 import random
 import sys
 import unittest
+from typing import Iterable, Optional
+import inspect
 
 from IPython import get_ipython
 import numpy
@@ -830,40 +832,115 @@ class ExerciseRunner:
         elif isinstance(msg, Submit):
             self.finish()
 
-class Quiz(collections.UserList):
-    def __init__(self, items=None, *, title=None, select=0, shuffle=False, navigation='free', weights=None):
-        super().__init__()
+
+# Allowed navigation modes for a quiz
+ALLOWED_NAV = {"free", "sequential"}
+
+class Quiz(list):
+    def __init__(
+        self,
+        items: Optional[Iterable] = None,
+        *,
+        title: Optional[str] = None,
+        select: int = 0,
+        shuffle: bool = False,
+        navigation: str = "free",
+        weights: Optional[dict[int, float]] = None,
+    ) -> None:
+        # Basic attributes
         self.title = title
         self.select = select
         self.shuffle = shuffle
-        self.navigation = navigation
+        self._navigation = "free"
+        self.navigation = navigation  # validated via property
         self.weights = weights or {}
 
-        if items is not None:
-            for item in items:
-                self.append(item)  # Uses overridden append()
+        # Initialize list items
+        super().__init__()
+        if items:
+            self.extend(items)
 
-    def append(self, item):
-        if not isinstance(item, (Exercise, Quiz)):
-            raise TypeError(f"Quiz can only contain Exercise or Quiz instances, got {type(item)}")
-        super().append(item)
+        self._validate_uniform_max_score_if_needed()
 
-    def insert(self, index, item):
-        if not isinstance(item, (Exercise, Quiz)):
-            raise TypeError(f"Quiz can only contain Exercise or Quiz instances, got {type(item)}")
-        super().insert(index, item)
+    # Navigation property with runtime validation    
+    @property
+    def navigation(self) -> str:
+        return self._navigation
 
-    def add_exercises_from_module(self, module, *exercise_names):
-        # Calling the '__dir__' method instead of the 'dir' built-in
-        # avoids alphabetical sorting of the exercises added to the pool.
-        if len(exercise_names) == 0:
-            exercise_names = module.__dir__()
-        for name in exercise_names:
-            obj = getattr(module, name)
-            if isinstance(obj, type) and issubclass(obj, Exercise):
-                if not inspect.isabstract(obj):
-                    self.data.append(obj())
+    @navigation.setter
+    def navigation(self, value: str) -> None:
+        if value not in ALLOWED_NAV:
+            raise ValueError(f"navigation must be one of {ALLOWED_NAV}")
+        self._navigation = value
 
+    # Internal type check helper
+    def _coerce(self, x):
+        if isinstance(x, (Exercise, Quiz)):
+            return x
+        raise TypeError(f"Quiz can only contain Exercise or Quiz, got {type(x)}")
+
+    # List modification methods with type enforcement
+    def append(self, x) -> None:
+        super().append(self._coerce(x))
+        self._validate_uniform_max_score_if_needed()
+
+    def insert(self, i, x) -> None:
+        super().insert(i, self._coerce(x))
+        self._validate_uniform_max_score_if_needed()
+
+    def extend(self, it: Iterable) -> None:
+        super().extend(self._coerce(y) for y in it)
+        self._validate_uniform_max_score_if_needed()
+
+    def __setitem__(self, i, x) -> None:
+        if isinstance(i, slice):
+            super().__setitem__(i, [self._coerce(y) for y in x])
+        else:
+            super().__setitem__(i, self._coerce(x))
+        self._validate_uniform_max_score_if_needed()
+
+    def __iadd__(self, it):
+        self.extend(it)
+        return self
+
+    # Add all non-abstract Exercise subclasses from a module
+    def add_exercises_from_module(self, module, *exercise_names) -> None:
+        names = exercise_names or module.__dir__()
+        for name in names:
+            obj = getattr(module, name, None)
+            if isinstance(obj, type) and issubclass(obj, Exercise) and not inspect.isabstract(obj):
+                self.append(obj())
+
+    # Validate equal max_score if select>0
+    def _extract_max_score(self, item, weights: dict[int, float], index: int) -> Optional[float]:
+        weight = weights.get(index, 1)
+        if isinstance(item, Exercise):
+            return ParametrizedExercise(item).max_total_score * weight
+        elif isinstance(item, Quiz):
+            if item.select == 0:
+                return sum(
+                    item._extract_max_score(sub, item.weights, idx) or 0
+                    for idx, sub in enumerate(item)
+                ) * weight
+            else:
+                first_score = item._extract_max_score(item[0], item.weights, 0)
+                return item.select * first_score * weight if first_score is not None else None
+        return None
+
+    def _validate_uniform_max_score_if_needed(self) -> None:
+        if not (isinstance(self.select, int) and self.select > 0):
+            return
+        scores = []
+        for idx, item in enumerate(self):
+            s = self._extract_max_score(item, self.weights, idx)
+            if s is not None:
+                scores.append(s)
+        if scores:
+            first = scores[0]
+            if any(abs(s - first) > 1e-9 for s in scores[1:]):
+                raise ValueError(
+                    "select>0 requires all items to have the same max_score (for immediate Exercises)."
+                )
 
 class ExercisePool(collections.UserList):
 

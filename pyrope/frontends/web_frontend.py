@@ -1,5 +1,7 @@
 import subprocess, os, shutil, threading
 
+from string import Template
+from textwrap import dedent
 import nbformat
 
 from fastapi import FastAPI
@@ -19,9 +21,11 @@ class WebFrontend:
 
         self.web_dir = web_dir or 'pyrope/web'
         self.app = FastAPI()
-        self.api_host = "127.0.0.1"
+        self.api_host = "0.0.0.0"
         self.api_port = 8000
         self._setup_api()
+
+        self.debug = False
 
 # ------ Rest API ------
 
@@ -46,6 +50,8 @@ class WebFrontend:
             "title": quiz.title,
             "navigation": quiz.navigation,
             "weights": quiz.weights,
+            "select": quiz.select,
+            "shuffle": quiz.shuffle,
             "items": []
         }
 
@@ -64,26 +70,9 @@ class WebFrontend:
 
         return structure
         
-    def _quiz_to_dict(self, quiz):
-        from pyrope.core import Exercise, Quiz
-
-        items = []
-        count_exercises = 0
-        count_quizzes = 0
-
-        for item in quiz:
-            if isinstance(item, Exercise):
-                items.append({"type": "exercise", "name": f'{count_exercises}_{item.__class__.__name__}.ipynb'})
-                count_exercises += 1
-            elif isinstance(item, Quiz):
-                items.append({"type": "quiz", "name": item.title or f'{count_quizzes}_subquiz'  , "items": self._quiz_to_dict(item)})
-                count_quizzes += 1
-        return items
-    
-
 # ------ Voila/Notebooks ------  
 
-    def _build_notebook_dir(self, quiz, dir, path=''):
+    def _build_notebook_dir(self, quiz, dir, path='', baseweight=1):
         from pyrope.core import Exercise, Quiz
 
         os.makedirs(dir, exist_ok=True)
@@ -101,23 +90,34 @@ class WebFrontend:
                 file_name = f'{count_exercises}_{name}'
 
                 path_id = f"{path}/{file_name}"
-                code = (
-                    'import sys, os, json\n'
-                    'import ipywidgets as widgets\n'
-                    'from IPython.display import Javascript\n'
-                    'sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))\n'
-                    f'from {module} import {name}\n'
-                    f'id = "{path_id}"\n'
-                    'outputSpace=widgets.Output()\n'
-                    'display(outputSpace)\n'
-                    'def postResult(score, max_score):\n' \
-                    '   message = {\n'
-                    '    "type": "results", "id": id, "score": score, "maxScore": max_score\n'
-                    '   }\n' \
-                    '   js_code=f"window.parent.postMessage({json.dumps(message)},\\"*\\");"\n' #console.log({json.dumps(message)})"\n'
-                    '   with outputSpace: \n'
-                    '       display(Javascript(js_code))\n'
-                    f'{name}().run(callback=postResult)\n '
+                
+                weight = quiz.weights.get(count_exercises+count_quizzes, 1) * baseweight
+                
+                tmpl = Template(dedent("""\
+                import sys, os, json
+                import ipywidgets as widgets
+                from IPython.display import Javascript, display
+                sys.path.insert(0, os.path.abspath(os.path.join(os.getcwd(), "..")))
+                from $module import $name
+                id = $path_id
+                outputspace = widgets.Output()
+                display(outputspace)
+
+                def postresult(score, max_score):
+                    message = {"type": "results", "id": $path_id, "score": score, "maxScore": max_score}
+                    js_code = "window.parent.postMessage(" + json.dumps(message) + ", '*');"
+                    with outputspace:
+                        display(Javascript(js_code))
+
+                $name(weights=$weight).run(callback=postresult, debug=$debug)
+                """))
+
+                code = tmpl.substitute(
+                    module=module,
+                    name=name,
+                    path_id=repr(path_id),
+                    weight=repr(weight),
+                    debug=repr(self.debug),
                 )
                 
                 nb['cells'] = [nbformat.v4.new_code_cell(code)]
@@ -131,7 +131,8 @@ class WebFrontend:
             elif isinstance(item, Quiz):
                 quiz_name = item.title or f'{count_quizzes}_subquiz'
                 subdir = os.path.join(dir, quiz_name)
-                self._build_notebook_dir(item, subdir, f'{path}/{quiz_name}')
+                next_weight = quiz.weights.get(count_exercises+count_quizzes, 1) * baseweight
+                self._build_notebook_dir(item, subdir, f'{path}/{quiz_name}', next_weight)
 
                 count_quizzes += 1
 
@@ -150,6 +151,8 @@ class WebFrontend:
             "voila",
             "tmp_dir",
             "--no-browser",
+            "--port=8866",
+            "--Voila.ip=0.0.0.0",
             f"--Voila.tornado_settings={settings_str}"
         ])
         return process

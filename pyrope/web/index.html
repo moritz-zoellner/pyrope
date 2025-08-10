@@ -19,6 +19,11 @@
     </div>
 
     <script>
+        window.addEventListener("beforeunload", function (e) {
+            e.preventDefault();
+            e.returnValue = ''; // Standard-Text vom Browser
+        });
+
         async function fetchStructure() {
             const res = await fetch('/structure');
             return await res.json();
@@ -32,7 +37,11 @@
             let exerciseIndex = 0;
             let isSequential = structure.navigation === 'sequential'
             
-            structure.items.forEach(item => {
+            let items = structure.items;
+            if (structure.select > 0) items = items.sort(() => Math.random() - 0.5).slice(0, structure.select);
+            if (structure.shuffle) items = items.sort(() => Math.random() - 0.5);
+
+            items.forEach(item => {
                 if (typeof item === 'string') {
                     const fullPath = `${basePath}${item}`;
 
@@ -40,13 +49,7 @@
                     button.textContent = item.slice(2,-6);
                     button.id = `btn_${fullPath.slice(0,-6)}`;
                     button.onclick = () => showIframe(fullPath.slice(0,-6));
-                    
-                    if (structure.weights && structure.weights[exerciseIndex] !== undefined) {
-                        button.dataset.weight = structure.weights[exerciseIndex];
-                    } else {
-                        button.dataset.weight = "1";  // Standardgewicht
-                    }
-                    
+
                     if ((isSequential && exerciseIndex !== 0) || parentDisable) {
                         button.disabled = true;
                     }
@@ -96,7 +99,6 @@
         fetchStructure().then(structure => {
             const root = document.getElementById('task-list');
 
-            // Titel des obersten Quizzes anzeigen
             const rootLabel = document.createElement('div');
             rootLabel.textContent = structure.title || 'Quiz';
             rootLabel.classList.add('quiz-label');
@@ -112,12 +114,12 @@
             // if (event.origin !== "http://localhost:8000") return;
 
             const data = event.data;
+            console.log(data)
             if (data?.type === "results" && data.id) {
                 const btnId = `btn_${data.id}`;
                 const button = document.getElementById(btnId);
 
                 if (button) {
-                    const weight = Number(button.dataset.weight) || 1 
                     const percentage = data.score / data.maxScore;
                     
                     if (percentage >= 0.5) {
@@ -128,12 +130,12 @@
                         button.style.color = "#721c24";
                     }
 
-                    button.textContent = `${button.textContent} (${data.score * weight}/${data.maxScore * weight})`;
+                    button.textContent = `${button.textContent} (${data.score}/${data.maxScore})`;
                     const earnedElem = document.getElementById("score-earned");
                     const totalElem = document.getElementById("score-total");
 
-                    earnedElem.textContent = Number(earnedElem.textContent) + data.score * weight;
-                    totalElem.textContent = Number(totalElem.textContent) + data.maxScore * weight;
+                    earnedElem.textContent = Number(earnedElem.textContent) + data.score;
+                    totalElem.textContent = Number(totalElem.textContent) + data.maxScore;
 
                     let current = button;
                     const next = current.nextElementSibling
