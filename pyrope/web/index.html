@@ -58,7 +58,11 @@
                     container.appendChild(button);
 
                     const iframe = document.createElement('iframe');
-                    iframe.src = `http://localhost:8866/voila/render${fullPath}?`;
+                    const voilaBase = ["localhost", "0.0.0.0", "127.0.0.1"].includes(location.hostname)
+                        ? "http://localhost:8866"
+                        : "/voila";
+                    iframe.src = `${voilaBase}/voila/render${fullPath}?`;
+
                     iframe.classList.add('task-frame');
                     iframe.style.display = 'none';
                     iframe.dataset.path = fullPath.slice(0,-6);
