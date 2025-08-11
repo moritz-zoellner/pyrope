@@ -135,8 +135,13 @@ Then change to your install directory and run the commands below.
             python3 -m pyrope run
 
 
+Documentation
+=============
+
+This documentation is available online at `Read the Docs
+<https://pyrope-edu.readthedocs.io/>`_.
+
 .. toctree::
-    :caption: Documentation
     :maxdepth: 2
 
     installation
@@ -165,7 +170,7 @@ Contact
 
 Software development:
     * Konrad Schöbel <konrad.schoebel@htwk-leipzig.de>
-    * Paul Brassel <paul.brassel@htwk-leipzig.de>
+    * Paul Brassel <paul.brassel@medizin.uni-leipzig.de>
 
 Exercise pools:
     * Jochen Merker <jochen.merker@htwk-leipzig.de>

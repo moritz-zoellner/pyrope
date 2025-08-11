@@ -2,6 +2,8 @@
 __pycache__/
 *.egg-info/
 tmp_dir/ 
+docs/build/
+venv/
 
 # Jupyter
 .ipynb_checkpoints/

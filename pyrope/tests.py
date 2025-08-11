@@ -2,6 +2,7 @@
 import inspect
 import itertools
 from packaging import version
+from typing import Generator
 import unittest
 
 import matplotlib.pyplot as plt
@@ -62,7 +63,7 @@ class TestExercise(unittest.TestCase):
         self.assertFalse(
             hasattr(exercise, 'solution'),
             "Do not implement a 'solution' method. Use 'the_solution' "
-            "instead it the solution is unique or 'a_solution' if not."
+            "instead if the solution is unique or 'a_solution' if not."
         )
 
     @with_all_exercises
@@ -79,22 +80,53 @@ class TestExercise(unittest.TestCase):
         )
 
     @with_all_exercises
+    def test_parameter_names_are_stable(self, exercise):
+        """
+        The set of parameter names defined by an exercise through its
+        parameters method needs to be same over different runs to keep
+        exercises consistent.
+        """
+        names = set(core.ParametrizedExercise(exercise).parameters.keys())
+        names_ = set(core.ParametrizedExercise(exercise).parameters.keys())
+        self.assertEqual(
+            names, names_,
+            f"The keys of the dictionary returned by an exercise's "
+            f"parameters method must not change over different runs, got "
+            f"{names} and {names_} as parameter names."
+        )
+
+    @with_all_exercises
+    def test_ifield_names_are_stable(self, exercise):
+        """
+        The set of input field names defined by an exercise through its problem
+        method needs to be the same over different runs to keep exercises
+        consistent.
+        """
+        names = set(core.ParametrizedExercise(exercise).ifields.keys())
+        names_ = set(core.ParametrizedExercise(exercise).ifields.keys())
+        self.assertEqual(
+            names, names_,
+            f"The names of the input fields defined by an exercise's "
+            f"problem method must not change over different runs, got "
+            f"{names} and {names_} as input field names."
+        )
+
+    @with_all_exercises
     def test_maximal_total_score_is_stable(self, exercise):
-        '''
+        """
         The maximal total score of an exercise is calculated by inserting the
         sample solution. The sample solution depends on the exercise's
         parameters which could be randomized. Therefore, the maximal total
         score has to be same over different runs of an exercise.
-        '''
+        """
         max_total_score = core.ParametrizedExercise(exercise).max_total_score
-        for _ in range(config.maximum_test_repetitions):
-            pexercise = core.ParametrizedExercise(exercise)
-            self.assertEqual(
-                max_total_score, pexercise.max_total_score,
-                f"The maximal total score must not change over different "
-                f"runs of an exercise, got {max_total_score} and "
-                f"{pexercise.max_total_score} as a maximal total score."
-            )
+        max_total_score_ = core.ParametrizedExercise(exercise).max_total_score
+        self.assertEqual(
+            max_total_score, max_total_score_,
+            f"The maximal total score must not change over different "
+            f"runs of an exercise, got {max_total_score} and "
+            f"{max_total_score_} as a maximal total score."
+        )
 
 
 class TestParametrizedExercise(unittest.TestCase):
@@ -129,10 +161,12 @@ class TestParametrizedExercise(unittest.TestCase):
         preamble = pexercise.exercise.preamble
         if callable(preamble):
             preamble = pexercise.apply(preamble, pexercise.parameters)
+        if preamble is None:
+            return
         self.assertIsInstance(
             preamble, str,
-            f"The 'preamble' method must return a string, not an instance of "
-            f"{preamble.__class__}."
+            f"The 'preamble' method must return a string or None, not an "
+            f"instance of {preamble.__class__}."
         )
         ofields = {
             ofield for _, ofield, _ in TemplateFormatter.parse(preamble)
@@ -151,10 +185,12 @@ class TestParametrizedExercise(unittest.TestCase):
         If implemented, the 'parameters' method of an exercise must return a
         dictionary. Its keys must be strings, as they name the input fields.
         """
-        parameters = pexercise.parameters
+        parameters = pexercise.apply(pexercise.exercise.parameters, {})
+        if parameters is None:
+            return
         self.assertIsInstance(
             parameters, dict,
-            "The 'parameters' method must return a dictionary."
+            "The 'parameters' method must return a dictionary or None."
         )
         for key in parameters.keys():
             self.assertIsInstance(
@@ -166,27 +202,48 @@ class TestParametrizedExercise(unittest.TestCase):
     @with_all_pexercises
     def test_hints_method(self, pexercise):
         """
-        The hints method has to return a string or an iterable object yielding
-        only strings.
+        The hints method has to return a string or a list, tuple, generator
+        where all elements are strings or a dictionary where keys are names of
+        input fields and values are of the just mentioned types.
         """
         hints = pexercise.apply(
             pexercise.exercise.hints, pexercise.parameters
         )
+        self.assertIsInstance(
+            hints, (str, dict, list, tuple, Generator),
+            f"The 'hints' method has to return a string, dictionary, list, "
+            f"tuple or generator, got {type(hints)}."
+
+        )
         if isinstance(hints, str):
             return
-        try:
-            hints = iter(hints)
-        except TypeError:
-            raise TypeError(
-                f"The 'hints' method has to return a string or an iterable "
-                f"object, got {type(hints)}."
-            )
-        for hint in hints:
-            self.assertIsInstance(
-                hint, str,
-                f"If 'hints' returns an iterable object, all elements have to "
-                f"be strings, got {type(hint)}."
-            )
+        elif isinstance(hints, dict):
+            for name, ifield_hints in hints.items():
+                self.assertIn(
+                    name, pexercise.ifields.keys(),
+                    f"There is no input field named {name}."
+                )
+                self.assertIsInstance(
+                    ifield_hints, (str, list, tuple, Generator),
+                    f"If 'hints' returns a dictionary, all values have to be "
+                    f"either strings, lists, tuples or generators, got "
+                    f"{type(ifield_hints)} for key {name}."
+                )
+                if isinstance(ifield_hints, str):
+                    continue
+                for hint in ifield_hints:
+                    self.assertIsInstance(
+                        hint, str,
+                        f"All elements have to be strings, got {type(hint)} "
+                        f"for key {name}."
+                    )
+        else:
+            for hint in hints:
+                self.assertIsInstance(
+                    hint, str,
+                    f"If 'hints' returns a list, tuple or generator, all "
+                    f"elements have to be strings, got {type(hint)}."
+                )
 
     @with_all_pexercises
     def test_problem_method(self, pexercise):
@@ -201,37 +258,6 @@ class TestParametrizedExercise(unittest.TestCase):
             f"The 'problem' method must return an instance of {nodes.Problem},"
             f" not of {problem.__class__}."
         )
-
-    @with_all_pexercises
-    def test_feedback_method(self, pexercise):
-        """
-        A feedback must be a string. Its output fields must be in the
-        exercise's parameters or in the answers.
-        """
-        kwargs = pexercise.parameters | pexercise.dummy_input
-        feedback = pexercise.apply(
-            pexercise.exercise.feedback, kwargs
-        )
-        self.assertIsNot(
-            feedback, None,
-            'Feedback is None. If you really want no feedback, return an '
-            'empty string in the last line.'
-        )
-        self.assertIsInstance(
-            feedback, str,
-            f"The 'feedback' method must return a string, not an instance "
-            f"of {feedback.__class__}."
-        )
-        ofields = {
-            ofield for _, ofield, _ in TemplateFormatter.parse(feedback)
-            if ofield is not None
-        }
-        for ofield in ofields:
-            self.assertIn(
-                ofield, kwargs,
-                f"There is no parameter or answer for output field '{ofield}' "
-                f"in the feedback string."
-            )
 
     @with_all_pexercises
     def test_metadata(self, pexercise):
@@ -493,6 +519,8 @@ class TestParametrizedExercise(unittest.TestCase):
               case of a tuple the first value is interpreted as the score and
               the second one as the maximal score of the input field specified
               in the key.
+        The type of the returned score must not change over different runs to
+        keep exercises consistent.
         """
         exercise = pexercise.exercise
         answers = {
@@ -510,6 +538,17 @@ class TestParametrizedExercise(unittest.TestCase):
             f"The scores method has to return either a float type, tuple, "
             f"dict or None, got {type(scores)}."
         )
+
+        pexercise_ = core.ParametrizedExercise(exercise)
+        scores_ = pexercise_.apply(
+            exercise.scores, pexercise_.parameters | answers
+        )
+        self.assertEqual(
+            type(scores), type(scores_),
+            f"The scores method must return the same type over different "
+            f"runs of an exercise, got {type(scores)} and {type(scores_)}."
+        )
+
         if scores is None:
             return
         if isinstance(scores, core.float_types):
@@ -581,12 +620,33 @@ class TestParametrizedExercise(unittest.TestCase):
     def test_feedback_with_inputs(self, pexercise):
         """
         Test if inputs (especially None values) raise an exception in the
-        feedback method.
+        feedback method. Furthermore, a feedback must be a string and its
+        output fields must be in the exercise's parameters or answers.
         """
         try:
-            pexercise.feedback
+            feedback = pexercise.apply(
+                pexercise.exercise.feedback,
+                pexercise.parameters | pexercise.answers
+            )
         except Exception:
             self.fail(
                 f"The feedback method raises an error for the following "
                 f"inputs: {pexercise.answers}."
+            )
+        if feedback is None:
+            return
+        self.assertIsInstance(
+            feedback, str,
+            f"The 'feedback' method must return a string or None, not an "
+            f"instance of {feedback.__class__}."
+        )
+        ofields = {
+            ofield for _, ofield, _ in TemplateFormatter.parse(feedback)
+            if ofield is not None
+        }
+        for ofield in ofields:
+            self.assertIn(
+                ofield, pexercise.parameters | pexercise.answers,
+                f"There is no parameter or answer for output field '{ofield}' "
+                f"in the feedback string."
             )

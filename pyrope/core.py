@@ -587,17 +587,10 @@ class ParametrizedExercise:
             self.exercise.scores, self.parameters | answers
         )
 
-        # Input field-wise scoring for float and tuple types if there is only
-        # one input field.
+        # If necessary, convert scores to dict in case of a single input field.
         if isinstance(scores, float_types + (tuple,)):
             name = list(self.ifields.keys())[0]
-            if isinstance(scores, float_types):
-                scores = float(scores)
-            else:
-                scores = float(scores[0])
-            self._total_score = scores * self.score_weights[name]
-            self.ifields[name].displayed_score = self._total_score
-            return {name: self._total_score}
+            scores = {name: scores}
 
         # Cast scores and fill up missing scores with None.
         if isinstance(scores, dict):
